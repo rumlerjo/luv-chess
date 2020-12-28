@@ -1,9 +1,9 @@
 # shaft-chess: a pretty scuffed chess module in lua
-#### Usage:
+### Usage:
 ```lua
 local chess = require("file path here")
 ```
-**Board Functions**
+#### Board Functions
 ```lua
 --create a board
 local board = chess.board:new()
