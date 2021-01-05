@@ -222,7 +222,7 @@ function bishop(board, piece)
     local possibilities = {}
     local count = 1
     -- up right
-    for i = v, 8 do
+    for i = v + 1, 8 do
         if (h + count) > 0 and (h + count) < 9 then
             local space = TranslateSpace({i, h + count})
             if board[space].piece ~= nil then
@@ -234,10 +234,11 @@ function bishop(board, piece)
                 table.insert(possibilities, space)
             end
         end
+        count = count + 1
     end
     -- up left
     count = 1
-    for i = v, 8 do
+    for i = v + 1, 8 do
         if (h - count) > 0 and (h - count) < 9 then
             local space = TranslateSpace({i, h - count})
             if board[space].piece ~= nil then
@@ -249,10 +250,11 @@ function bishop(board, piece)
                 table.insert(possibilities, space)
             end
         end
+        count = count + 1
     end
     -- down right
     count = 1
-    for i = 8, v, -1 do
+    for i = v - 1, 1, -1 do
         if (h + count) > 0 and (h + count) < 9 then
             local space = TranslateSpace({i, h + count})
             if board[space].piece ~= nil then
@@ -264,10 +266,11 @@ function bishop(board, piece)
                 table.insert(possibilities, space)
             end
         end
+        count = count + 1
     end
     -- down left
     count = 1
-    for i = 8, v, -1 do
+    for i = v - 1, 1, -1 do
         if (h - count) > 0 and (h - count) < 9 then
             local space = TranslateSpace({i, h - count})
             if board[space].piece ~= nil then
@@ -279,6 +282,7 @@ function bishop(board, piece)
                 table.insert(possibilities, space)
             end
         end
+        count = count + 1
     end
     return possibilities
 end
@@ -287,10 +291,10 @@ function queen(board, piece)
     -- just run rook and bishop lul
     local possibilities = {}
     for i, pos in pairs(rook(board, piece)) do
-        table.insert(pos, possibilities)
+        table.insert(possibilities, pos)
     end
     for i, pos in pairs(bishop(board, piece)) do
-        table.insert(pos, possibilities)
+        table.insert(possibilities, pos)
     end
     return possibilities
 end
@@ -312,6 +316,17 @@ function king(board, piece)
             end
         end
     end
+    if not piece.lastPosition and board[TranslateSpace{v, h + 1}] and not board[TranslateSpace{v, h + 1}].piece
+    and board[TranslateSpace{v, h + 2}] and not board[TranslateSpace{v, h + 2}].piece and board[TranslateSpace{v, h + 3}]
+    and board[TranslateSpace{v, h + 3}].piece.type == "rook" and not board[TranslateSpace{v, h + 3}].piece.lastPosition then
+        table.insert(possibilities, "kc")
+    end
+    if not piece.lastPosition and board[TranslateSpace{v, h - 1}] and not board[TranslateSpace{v, h - 1}].piece
+    and board[TranslateSpace{v, h - 2}] and not board[TranslateSpace{v, h - 2}].piece  and board[TranslateSpace{v, h - 3}] 
+    and not board[TranslateSpace{v, h - 3}].piece and board[TranslateSpace{v, h - 4}] and board[TranslateSpace{v, h - 4}].piece.type == "rook" 
+    and not board[TranslateSpace{v, h - 4}].piece.lastPosition then
+        table.insert(possibilities, "qc")
+    end
     return possibilities
 end
 
@@ -327,9 +342,9 @@ local pieces = {
 }
 ]]
 
-function board:new()
+function board:new(old)
     -- create the board object
-    local b = {}
+    local b = old or {}
     setmetatable(b, self)
     self.__index = self
     return b
@@ -426,8 +441,27 @@ function board:get_checks(king)
 end
 
 function board:move(piece, position)
+    --kc for kingside castling
+    --qc for queenside castling
+    local wKingCastle = false
+    local wQueenCastle = false
+    local bKingCastle = false
+    local bQueenCastle = false
     local piecePos = TranslateSpace({piece.coordinates.vertical, piece.coordinates.horizontal})
     if in_table(piece.behavior(self, piece), position) then
+        if piece.color == "black" and position == "kc" then
+            position = "g8"
+            bKingCastle = true
+        elseif piece.color == "black" and position == "qc" then
+            position = "c8"
+            bQueenCastle = true
+        elseif piece.color == "white" and position == "kc" then
+            position = "g1"
+            wKingCastle = true
+        elseif piece.color == "white" and position == "qc" then
+            position = "c1"
+            wQueenCastle = true
+        end
         local new_coords
         local removedPiece
         if self[position].piece then
@@ -439,7 +473,26 @@ function board:move(piece, position)
         self[position].piece = self[piecePos].piece
         self[piecePos].piece.coordinates = new_coords
         self[piecePos].piece = nil
-        return true, removedPiece -- true, nil if no piece was removed
+        -- move the rooks if castling
+        if wKingCastle then
+            self.f1.piece = self.h1.piece
+            self.f1.piece.coordinates = TranslateCoords("f1")
+            self.h1.piece = nil
+        elseif wQueenCastle then
+            self.d1.piece = self.a1.piece
+            self.d1.piece.coordinates = TranslateCoords("d1")
+            self.a1.piece = nil
+        elseif bKingCastle then
+            self.f8.piece = self.h8.piece
+            self.f8.piece.coordinates = TranslateCoords("f8")
+            self.h8.piece = nil
+        elseif bQueenCastle then
+            self.d8.piece = self.a1.piece
+            self.d8.piece.coordinates = TranslateCoords("d8")
+            self.a8.piece = nil
+        end
+        -- if it doesn't validate we're fucked because am lazy for now
+        return true, removedPiece -- true, nil if no piece was removed, may pass something to indicate castling
     end
     return false, nil
 end
@@ -475,6 +528,7 @@ function board:validate_and_move(piece, position)
     local tryMove, rem = self:move(self[piecePos].piece, position)
     if tryMove then
         if not self:get_checks(find_king(self, piece.color)) then
+            piece.lastPosition = piecePos
             return true
         end
         if rem then
@@ -490,6 +544,7 @@ end
 
 function board:setup()
     -- generate default values for board positions. reset if board already has spaces filled.
+    -- will assign a last position for en passant/castling
     -- pawns
     for i = 1, 8 do
         local whiteSpace = TranslateSpace({2, i})
@@ -521,5 +576,6 @@ function board:setup()
 end
 
 return {
-    board = board;
+    board = board,
+    find_king = find_king,
 }
