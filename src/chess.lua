@@ -1,6 +1,4 @@
---avoiding en passant and castling to start out
--- this is for use in luaJIT, specifically luvit environment
--- there are foreseeable bottlenecks in lua with looping for available moves, although passes made aren't that intensive
+-- this was designed with the luvit environment in mind, but is still pure lua
 
 local board = {
     a8 = {}, b8 = {}, c8 = {}, d8 = {}, e8 = {}, f8 = {}, g8 = {}, h8 = {},
