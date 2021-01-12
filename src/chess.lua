@@ -98,16 +98,21 @@ end
 -- piece behaviors
 function pawn(board, piece)
     -- this just isn't consistent with the rest of them huh
+    -- en passant at some point in the future ig
     local possibilities = {}
     local h = piece.coordinates.horizontal
     local v = piece.coordinates.vertical
     if piece.color == "white" then
         -- white possibilities
         local up = TranslateSpace({v + 1, h})
+        local up_2 = TranslateSpace({v + 2, h})
         local diagRight = TranslateSpace({v + 1, h + 1})
         local diagLeft = TranslateSpace({v + 1, h - 1})
         if board[up] and not board[up].piece then
             table.insert(possibilities, up)
+        end
+        if board[up_2] and not board[up_2].piece and not piece.lastPosition then
+            table.insert(possibilities, up_2)
         end
         if board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color then
             table.insert(possibilities, diagRight)
@@ -118,10 +123,14 @@ function pawn(board, piece)
     elseif piece.color == "black" then
         -- black possibilities
         local down = TranslateSpace({v - 1, h})
+        local down_2 = TranslateSpace({v - 2, h})
         local diagRight = TranslateSpace({v - 1, h + 1})
         local diagLeft = TranslateSpace({v - 1, h - 1})
         if board[down] and not board[down].piece then
             table.insert(possibilities, down)
+        end
+        if board[down_2] and not board[down_2].piece and not piece.lastPosition then
+            table.insert(possibilities, down_2)
         end
         if board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color then
             table.insert(possibilities, diagRight)
@@ -157,8 +166,8 @@ function rook(board, piece)
     local h = piece.coordinates.horizontal
     local possibilities = {}
     -- up
-    for i = v, 8 do
-        local space = TranslateSpace({v + i, h})
+    for i = v + 1, 8 do
+        local space = TranslateSpace({i, h})
         if board[space] then
             if board[space].piece then
                 if board[space].piece.color ~= piece.color then
@@ -171,8 +180,8 @@ function rook(board, piece)
         end
     end
     --down
-    for i = v, 1, -1 do
-        local space = TranslateSpace({v + i, h})
+    for i = v - 1, 1, -1 do
+        local space = TranslateSpace({i, h})
         if board[space] then
             if board[space].piece then
                 if board[space].piece.color ~= piece.color then
@@ -185,8 +194,8 @@ function rook(board, piece)
         end
     end
     -- right
-    for i = h, 8 do
-        local space = TranslateSpace({v, h + i})
+    for i = h + 1, 8 do
+        local space = TranslateSpace({v, i})
         if board[space] then
             if board[space].piece then
                 if board[space].piece.color ~= piece.color then
@@ -199,8 +208,8 @@ function rook(board, piece)
         end
     end
     -- left
-    for i = h, 1, -1 do
-        local space = TranslateSpace({v, h + i})
+    for i = h - 1, 1, -1 do
+        local space = TranslateSpace({v, i})
         if board[space] then
             if board[space].piece then
                 if board[space].piece.color ~= piece.color then
@@ -330,6 +339,14 @@ function king(board, piece)
     return possibilities
 end
 
+local behaviors = {
+    pawn = pawn,
+    rook = rook,
+    knight = knight,
+    bishop = bishop,
+    queen = queen,
+    king = king,
+}
 
 --[[ was gonna set pieces up as a metatable but then didnt
 local pieces = {
@@ -338,7 +355,7 @@ local pieces = {
     rook = {type = "rook", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.rook},
     bishop = {type = "bishop", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.bishop},
     queen = {type = "queen", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.queen},
-    king = {type = "king", color = "", coordinates = {vertical = 0, horizontal = 0},  behavior = behabiors.king},
+    king = {type = "king", color = "", coordinates = {vertical = 0, horizontal = 0},  behavior = behaviors.king},
 }
 ]]
 
@@ -376,11 +393,11 @@ function board:display()
 end
 ]]
 
-local function find_king(board, color)
+function board:find_king(color)
     for v = 8, 1, -1 do
         for h = 1, 8 do
             local space = TranslateSpace({v, h})
-            if board[space] and board[space].piece and board[space].piece.type == "king" and board[space].piece.color == color then
+            if self[space] and self[space].piece and self[space].piece.type == "king" and self[space].piece.color == color then
                 return space
             end
         end
@@ -416,7 +433,7 @@ end
 
 function board:get_moves(position)
     local piece = self[position].piece
-    return piece.behavior(self, piece)
+    return behaviors[piece.type](self, piece)
 end
 
 function board:get_checks(king)
@@ -427,7 +444,7 @@ function board:get_checks(king)
         for h = 1, 8 do
             local space = TranslateSpace({v, h})
             if self[space].piece and self[space].piece.color ~= kingPiece.color then
-                for i, pos in pairs(self[space].piece.behavior(self, self[space].piece)) do
+                for i, pos in pairs(self:get_moves(space)) do
                     table.insert(possibilities, pos)
                 end
             end
@@ -443,34 +460,36 @@ end
 function board:move(piece, position)
     --kc for kingside castling
     --qc for queenside castling
+    -- move on the board. return true if possible
+    local new_pos = position
     local wKingCastle = false
     local wQueenCastle = false
     local bKingCastle = false
     local bQueenCastle = false
     local piecePos = TranslateSpace({piece.coordinates.vertical, piece.coordinates.horizontal})
-    if in_table(piece.behavior(self, piece), position) then
-        if piece.color == "black" and position == "kc" then
-            position = "g8"
+    if in_table(self:get_moves(piecePos), new_pos) then
+        if piece.color == "black" and new_pos == "kc" then
+            new_pos = "g8"
             bKingCastle = true
-        elseif piece.color == "black" and position == "qc" then
-            position = "c8"
+        elseif piece.color == "black" and new_pos == "qc" then
+            new_pos = "c8"
             bQueenCastle = true
-        elseif piece.color == "white" and position == "kc" then
-            position = "g1"
+        elseif piece.color == "white" and new_pos == "kc" then
+            new_pos = "g1"
             wKingCastle = true
-        elseif piece.color == "white" and position == "qc" then
-            position = "c1"
+        elseif piece.color == "white" and new_pos == "qc" then
+            new_pos = "c1"
             wQueenCastle = true
         end
         local new_coords
         local removedPiece
-        if self[position].piece then
-            new_coords = self[position].piece.coordinates
-            removedPiece = self[position].piece
+        if self[new_pos].piece then
+            new_coords = self[new_pos].piece.coordinates
+            removedPiece = self[new_pos].piece
         else
-            new_coords = TranslateCoords(position)
+            new_coords = TranslateCoords(new_pos)
         end
-        self[position].piece = self[piecePos].piece
+        self[new_pos].piece = self[piecePos].piece
         self[piecePos].piece.coordinates = new_coords
         self[piecePos].piece = nil
         -- move the rooks if castling
@@ -497,23 +516,85 @@ function board:move(piece, position)
     return false, nil
 end
 
+function board:RemoveCastle(color, type)
+    if type == "kc" then
+        if color == "white" then
+            -- the white coords
+            self.e1.piece = self.g1.piece
+            self.e1.piece.coordinates = TranslateCoords("e1")
+            self.g1.piece = nil
+            self.h1.piece = self.f1.piece
+            self.h1.piece.coordinates = TranslateCoords("h1")
+            self.f1.piece = nil
+        elseif color == "black" then
+            -- the black coords
+            self.e8.piece = self.g1.piece
+            self.e8.piece.coordinates = TranslateCoords("e8")
+            self.g8.piece = nil
+            self.h8.piece = self.f1.piece
+            self.h8.piece.coordinates = TranslateCoords("h8")
+            self.f8.piece = nil
+        end
+    elseif type == "qc" then
+        if color == "white" then
+            -- the white coords
+            self.e1.piece = self.c1.piece
+            self.e1.piece.coordinates = TranslateCoords("c1")
+            self.c1.piece = nil
+            self.a1.piece = self.d1.piece
+            self.a1.piece.coordinates = TranslateCoords("a1")
+            self.d1.piece = nil
+        elseif color == "black" then
+            -- the black coords
+            self.e8.piece = self.c1.piece
+            self.e8.piece.coordinates = TranslateCoords("c8")
+            self.c8.piece = nil
+            self.a8.piece = self.d1.piece
+            self.a8.piece.coordinates = TranslateCoords("a8")
+            self.a8.piece = nil
+        end
+    end
+end
+
+function board:SimulateMove(piece, position)
+    local orig_v = piece.coordinates.vertical
+    local orig_h = piece.coordinates.horizontal
+    local origPos = TranslateSpace({orig_v, orig_h})
+    local possible = false
+    local tryMove, rem = self:move(piece, position)
+    if tryMove then
+        if not self:get_checks(self:find_king(piece.color)) then
+            possible = true
+        end
+        if rem then
+            self[origPos].piece = self[position].piece
+            self[position].piece = rem
+            self[origPos].piece.coordinates = TranslateCoords(origPos)
+        else
+            --checking in case of castling
+            if position == "kc" or position == "qc" then
+                self:RemoveCastle(piece.color, position)
+            else
+                self[origPos].piece = self[position].piece
+                self[position].piece = nil
+                self[origPos].piece.coordinates = TranslateCoords(origPos)
+            end
+        end
+    end
+    return possible
+end
+
 function board:checkmate(king)
     local kingPiece = self[king].piece
     local move_out = {}
-    if self:get_checks(kingPiece) then
-        local moves = king.behavior(self, kingPiece)
-        for i, m in pairs(moves) do
-            local tryMove, rem = self:move(kingPiece, m)
-            if tryMove then
-                if not self:get_checks(king) then
-                    table.insert(move_out, m)
-                end
-                if rem then
-                    self:move(self[position].piece, piecePos)
-                    self[position] = rem
-                else
-                    self:move(self[position].piece, piecePos)
-                end
+    if self:get_checks(king) then
+        for i, m in pairs(self:get_moves(king)) do
+            local orig_v = kingPiece.coordinates.vertical
+            local orig_h = kingPiece.coordinates.horizontal
+            local origPos = TranslateSpace({orig_v, orig_h})
+            local possible = self:SimulateMove(kingPiece, m)
+            if possible then
+                table.insert(move_out, m)
             end
         end
     end
@@ -524,22 +605,15 @@ function board:checkmate(king)
 end
 
 function board:validate_and_move(piece, position)
+    -- simulate where moving a piece would put the player. if it puts the player in check, return false. otherwise move and return true.
+    local new_pos = position
     local piecePos = TranslateSpace({piece.coordinates.vertical, piece.coordinates.horizontal})
-    local tryMove, rem = self:move(self[piecePos].piece, position)
-    if tryMove then
-        if not self:get_checks(find_king(self, piece.color)) then
-            piece.lastPosition = piecePos
-            return true
-        end
-        if rem then
-            self:move(self[position].piece, piecePos)
-            self[position] = rem
-        else
-            self:move(self[position].piece, piecePos)
-        end
-        return false
+    local possible = self:SimulateMove(self[piecePos].piece, new_pos)
+    if possible then
+        local moved, removed = self:move(self[piecePos].piece, new_pos)
+        return moved, removed
     end
-    return false
+    return false, nil
 end
 
 function board:setup()
@@ -549,33 +623,34 @@ function board:setup()
     for i = 1, 8 do
         local whiteSpace = TranslateSpace({2, i})
         local blackSpace = TranslateSpace({7, i})
-        self[whiteSpace].piece = {type = "pawn", color = "white", coordinates = {vertical = 2, horizontal = i}, behavior = pawn}
-        self[blackSpace].piece = {type = "pawn", color = "black", coordinates = {vertical = 7, horizontal = i}, behavior = pawn}
+        self[whiteSpace].piece = {type = "pawn", color = "white", coordinates = {vertical = 2, horizontal = i}, --[[behavior = pawn]]}
+        self[blackSpace].piece = {type = "pawn", color = "black", coordinates = {vertical = 7, horizontal = i}, --[[behavior = pawn]]}
     end
     -- rooks
-    self.a1.piece = {type = "rook", color = "white", coordinates = {vertical = 1, horizontal = 1}, behavior = rook}
-    self.h1.piece = {type = "rook", color = "white", coordinates = {vertical = 1, horizontal = 8}, behavior = rook}
-    self.a8.piece = {type = "rook", color = "black", coordinates = {vertical = 8, horizontal = 1}, behavior = rook}
-    self.h8.piece = {type = "rook", color = "black", coordinates = {vertical = 8, horizontal = 8}, behavior = rook}
+    self.a1.piece = {type = "rook", color = "white", coordinates = {vertical = 1, horizontal = 1}, --[[behavior = rook]]}
+    self.h1.piece = {type = "rook", color = "white", coordinates = {vertical = 1, horizontal = 8}, --[[behavior = rook]]}
+    self.a8.piece = {type = "rook", color = "black", coordinates = {vertical = 8, horizontal = 1}, --[[behavior = rook]]}
+    self.h8.piece = {type = "rook", color = "black", coordinates = {vertical = 8, horizontal = 8}, --[[behavior = rook]]}
     -- knights
-    self.b1.piece = {type = "knight", color = "white", coordinates = {vertical = 1, horizontal = 2}, behavior = knight}
-    self.g1.piece = {type = "knight", color = "white", coordinates = {vertical = 1, horizontal = 7}, behavior = knight}
-    self.b8.piece = {type = "knight", color = "black", coordinates = {vertical = 8, horizontal = 2}, behavior = knight}
-    self.g8.piece = {type = "knight", color = "black", coordinates = {vertical = 8, horizontal = 7}, behavior = knight}
+    self.b1.piece = {type = "knight", color = "white", coordinates = {vertical = 1, horizontal = 2}, --[[behavior = knight]]}
+    self.g1.piece = {type = "knight", color = "white", coordinates = {vertical = 1, horizontal = 7}, --[[behavior = knight]]}
+    self.b8.piece = {type = "knight", color = "black", coordinates = {vertical = 8, horizontal = 2}, --[[behavior = knight]]}
+    self.g8.piece = {type = "knight", color = "black", coordinates = {vertical = 8, horizontal = 7}, --[[behavior = knight]]}
     -- bishops
-    self.c1.piece = {type = "bishop", color = "white", coordinates = {vertical = 1, horizontal = 3}, behavior = bishop}
-    self.f1.piece = {type = "bishop", color = "white", coordinates = {vertical = 1, horizontal = 6}, behavior = bishop}
-    self.c8.piece = {type = "bishop", color = "black", coordinates = {vertical = 8, horizontal = 3}, behavior = bishop}
-    self.f8.piece = {type = "bishop", color = "black", coordinates = {vertical = 8, horizontal = 6}, behavior = bishop}
+    self.c1.piece = {type = "bishop", color = "white", coordinates = {vertical = 1, horizontal = 3}, --[[behavior = bishop]]}
+    self.f1.piece = {type = "bishop", color = "white", coordinates = {vertical = 1, horizontal = 6}, --[[behavior = bishop]]}
+    self.c8.piece = {type = "bishop", color = "black", coordinates = {vertical = 8, horizontal = 3}, --[[behavior = bishop]]}
+    self.f8.piece = {type = "bishop", color = "black", coordinates = {vertical = 8, horizontal = 6}, --[[behavior = bishop]]}
     --queens
-    self.d1.piece = {type = "queen", color = "white", coordinates = {vertical = 1, horizontal = 4}, behavior = queen}
-    self.d8.piece = {type = "queen", color = "black", coordinates = {vertical = 8, horizontal = 4}, behavior = queen}
+    self.d1.piece = {type = "queen", color = "white", coordinates = {vertical = 1, horizontal = 4}, --[[behavior = queen]]}
+    self.d8.piece = {type = "queen", color = "black", coordinates = {vertical = 8, horizontal = 4}, --[[behavior = queen]]}
     --kings
-    self.e1.piece = {type = "king", color = "white", coordinates = {vertical = 1, horizontal = 5},  behavior = king}
-    self.e8.piece = {type = "king", color = "black", coordinates = {vertical = 8, horizontal = 5},  behavior = king}
+    self.e1.piece = {type = "king", color = "white", coordinates = {vertical = 1, horizontal = 5},  --[[behavior = king]]}
+    self.e8.piece = {type = "king", color = "black", coordinates = {vertical = 8, horizontal = 5},  --[[behavior = king]]}
 end
 
 return {
     board = board,
-    find_king = find_king,
+    in_table = in_table,
+    RepresentPiece = RepresentPiece,
 }
