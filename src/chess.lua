@@ -584,9 +584,29 @@ function board:SimulateMove(piece, position)
     return possible
 end
 
+function board:CheckSacs(color)
+    -- see which pieces could sacrifice, block, or take in order to get king out of check
+    local ret_tab = {}
+    for v = 8, 1, -1 do
+        for h = 1, 8 do
+            local space = TranslateSpace({v, h})
+            if self[space] and self[space].piece and self[space].piece.color == color and self[space].piece.type ~= "king" then
+                for i, m in pairs(self:get_moves(space)) do
+                    if self:SimulateMove(self[space].piece) then
+                        table.insert(ret_tab, space)
+                        break
+                    end
+                end
+            end
+        end
+    end
+    return ret_tab
+end
+
 function board:checkmate(king)
     local kingPiece = self[king].piece
     local move_out = {}
+    local sacs = {}
     if self:get_checks(king) then
         for i, m in pairs(self:get_moves(king)) do
             local orig_v = kingPiece.coordinates.vertical
@@ -598,7 +618,8 @@ function board:checkmate(king)
             end
         end
     end
-    if #move_out > 0 then
+    sacs = self:CheckSacs(kingPiece.color)
+    if #move_out > 0 or #sacs > 0 then
         return false
     end
     return true
