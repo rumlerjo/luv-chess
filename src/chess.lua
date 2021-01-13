@@ -1,4 +1,6 @@
--- this was designed with the luvit environment in mind, but is still pure lua
+--avoiding en passant and castling to start out
+-- this is for use in luaJIT, specifically luvit environment
+-- there are foreseeable bottlenecks in lua with looping for available moves, although passes made aren't that intensive
 
 local board = {
     a8 = {}, b8 = {}, c8 = {}, d8 = {}, e8 = {}, f8 = {}, g8 = {}, h8 = {},
@@ -590,7 +592,7 @@ function board:CheckSacs(color)
             local space = TranslateSpace({v, h})
             if self[space] and self[space].piece and self[space].piece.color == color and self[space].piece.type ~= "king" then
                 for i, m in pairs(self:get_moves(space)) do
-                    if self:SimulateMove(self[space].piece) then
+                    if self:SimulateMove(self[space].piece, m) then
                         table.insert(ret_tab, space)
                         break
                     end
@@ -630,6 +632,7 @@ function board:validate_and_move(piece, position)
     local possible = self:SimulateMove(self[piecePos].piece, new_pos)
     if possible then
         local moved, removed = self:move(self[piecePos].piece, new_pos)
+        piece.lastPosition = piecePos
         return moved, removed
     end
     return false, nil
