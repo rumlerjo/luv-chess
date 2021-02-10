@@ -1,6 +1,4 @@
---avoiding en passant and castling to start out
--- this is for use in luaJIT, specifically luvit environment
--- there are foreseeable bottlenecks in lua with looping for available moves, although passes made aren't that intensive
+-- This module is intended to be used in the luvit environment, but is still pure lua.
 
 local board = {
     a8 = {}, b8 = {}, c8 = {}, d8 = {}, e8 = {}, f8 = {}, g8 = {}, h8 = {},
@@ -528,10 +526,10 @@ function board:RemoveCastle(color, type)
             self.f1.piece = nil
         elseif color == "black" then
             -- the black coords
-            self.e8.piece = self.g1.piece
+            self.e8.piece = self.g8.piece
             self.e8.piece.coordinates = TranslateCoords("e8")
             self.g8.piece = nil
-            self.h8.piece = self.f1.piece
+            self.h8.piece = self.f8.piece
             self.h8.piece.coordinates = TranslateCoords("h8")
             self.f8.piece = nil
         end
@@ -546,10 +544,10 @@ function board:RemoveCastle(color, type)
             self.d1.piece = nil
         elseif color == "black" then
             -- the black coords
-            self.e8.piece = self.c1.piece
+            self.e8.piece = self.c8.piece
             self.e8.piece.coordinates = TranslateCoords("c8")
             self.c8.piece = nil
-            self.a8.piece = self.d1.piece
+            self.a8.piece = self.d8.piece
             self.a8.piece.coordinates = TranslateCoords("a8")
             self.a8.piece = nil
         end
