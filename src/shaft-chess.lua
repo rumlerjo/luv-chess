@@ -382,10 +382,13 @@ client:on("messageCreate", function(msg)
                                 local log_move
                                 if removed then
                                     log_move = chess.RepresentPiece(piece).."x"..end_pos
+                                elseif end_pos == "kc" then
+                                    log_move = "0-0"
+                                elseif end_pos == "qc" then
+                                    log_move = "0-0-0"
                                 else
                                     log_move = chess.RepresentPiece(piece)..end_pos
                                 end
-                                table.insert(game_info.move_log, log_move)
                                 if game_info.turn == "white" then
                                     game_info.turn = "black"
                                 else
@@ -394,8 +397,10 @@ client:on("messageCreate", function(msg)
                                 local check = board:get_checks(board:find_king(game_info.turn))
                                 local checkmate
                                 if check then
+                                    log_move = log_move.."+"
                                     checkmate = board:checkmate(board:find_king(game_info.turn))
                                 end
+                                local stalemate = board:stalemate()
                                 local title
                                 local footer
                                 local color
@@ -405,6 +410,7 @@ client:on("messageCreate", function(msg)
                                     color = "15448109"
                                 end
                                 if checkmate then
+                                    log_move = log_move.."+"
                                     if game_info.turn == "white" then
                                         title = log_move..", checkmate. Black wins!"
                                     else
@@ -413,15 +419,19 @@ client:on("messageCreate", function(msg)
                                 elseif check then
                                     title = log_move..", "..game_info.turn.." in check."
                                     footer = game_info.turn.." ("..guild:getMember(game_info[game_info.turn]).name..") to play."
+                                elseif stalemate then
+                                    title = log_move..", stalemate. It's a draw!"
+                                    footer = "Game over."
                                 else
                                     title = log_move
                                     footer = game_info.turn.." ("..guild:getMember(game_info[game_info.turn]).name..") to play."
                                 end
+                                table.insert(game_info.move_log, log_move)
                                 channel:send {
                                     embed = {
                                         title = title,
                                         image = {
-                                            url = board:display(),
+                                            url = board:display(game_info.turn),
                                         },
                                         color = color,
                                         footer = {
@@ -429,7 +439,7 @@ client:on("messageCreate", function(msg)
                                         },
                                     }
                                 }
-                                if checkmate then
+                                if checkmate or stalemate then
                                     game_info.turn = "game over"
                                     channel:send {
                                         embed = {

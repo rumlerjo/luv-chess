@@ -1,5 +1,5 @@
 -- This module is intended to be used in the luvit environment, but is still pure lua.
-
+-- and massively scuffed...
 local board = {
     a8 = {}, b8 = {}, c8 = {}, d8 = {}, e8 = {}, f8 = {}, g8 = {}, h8 = {},
     a7 = {}, b7 = {}, c7 = {}, d7 = {}, e7 = {}, f7 = {}, g7 = {}, h7 = {},
@@ -90,11 +90,11 @@ local function TranslateCoords(pos)
             h = i
         end
     end
-    return {vertical= v, horizontal = h}
+    return {vertical = v, horizontal = h}
 end
 
 -- piece behaviors
-function pawn(board, piece)
+local function pawn(board, piece)
     -- this just isn't consistent with the rest of them huh
     -- en passant at some point in the future ig
     local possibilities = {}
@@ -106,16 +106,25 @@ function pawn(board, piece)
         local up_2 = TranslateSpace({v + 2, h})
         local diagRight = TranslateSpace({v + 1, h + 1})
         local diagLeft = TranslateSpace({v + 1, h - 1})
-        if board[up] and not board[up].piece then
+        -- promotion
+        if board[up] and (v + 1) == 8 and not board[up].piece then
+            table.insert(possibilities, up.."p")
+        elseif board[up] and not board[up].piece then
+            -- normal up
             table.insert(possibilities, up)
         end
+        -- rest
         if board[up_2] and not board[up_2].piece and not piece.lastPosition then
             table.insert(possibilities, up_2)
         end
-        if board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color then
+        if board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color and (v + 1) == 8 then
+            table.insert(possibilities, diagRight.."p")
+        elseif board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color then
             table.insert(possibilities, diagRight)
         end
-        if board[diagLeft] and board[diagLeft].piece and board[diagLeft].piece.color ~= piece.color then
+        if board[diagLeft] and board[diagLeft].piece and board[diagLeft].piece.color ~= piece.color and (v + 1) == 8 then
+            table.insert(possibilities, diagLeft.."p")
+        elseif board[diagLeft] and board[diagLeft].piece and board[diagLeft].piece.color ~= piece.color then
             table.insert(possibilities, diagLeft)
         end
     elseif piece.color == "black" then
@@ -124,23 +133,34 @@ function pawn(board, piece)
         local down_2 = TranslateSpace({v - 2, h})
         local diagRight = TranslateSpace({v - 1, h + 1})
         local diagLeft = TranslateSpace({v - 1, h - 1})
+        -- promotion
+        if board[down] and (v - 1) == 1 and not board[down].piece then
+            table.insert(possibilities, down.."p")
+        elseif board[down] and not board[down].piece then
+            -- normal down
+            table.insert(possibilities, down)
+        end
         if board[down] and not board[down].piece then
             table.insert(possibilities, down)
         end
         if board[down_2] and not board[down_2].piece and not piece.lastPosition then
             table.insert(possibilities, down_2)
         end
-        if board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color then
+        if board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color and (v - 1) == 1 then
+            table.insert(possibilities, diagRight.."p")
+        elseif board[diagRight] and board[diagRight].piece and board[diagRight].piece.color ~= piece.color then
             table.insert(possibilities, diagRight)
         end
-        if board[diagLeft] and board[diagLeft].piece and board[diagLeft].piece.color ~= piece.color then
+        if board[diagLeft] and board[diagLeft].piece and board[diagLeft].piece.color ~= piece.color and (v - 1) == 1 then
+            table.insert(possibilities, diagLeft.."p")
+        elseif board[diagLeft] and board[diagLeft].piece and board[diagLeft].piece.color ~= piece.color then
             table.insert(possibilities, diagLeft)
         end
     end
     return possibilities
 end
 
-function knight(board, piece)
+local function knight(board, piece)
     -- Ls up 1 right 2, up 1 left 2, up 2 right 1, up 2 left 1 and backwards as well
     local h = piece.coordinates.horizontal
     local v = piece.coordinates.vertical
@@ -158,7 +178,7 @@ function knight(board, piece)
     return possibilities
 end
 
-function rook(board, piece)
+local function rook(board, piece)
     -- all the way horizontally and vertically
     local v = piece.coordinates.vertical
     local h = piece.coordinates.horizontal
@@ -222,7 +242,7 @@ function rook(board, piece)
     return possibilities
 end
 
-function bishop(board, piece)
+local function bishop(board, piece)
     -- diags
     local v = piece.coordinates.vertical
     local h = piece.coordinates.horizontal
@@ -294,7 +314,7 @@ function bishop(board, piece)
     return possibilities
 end
 
-function queen(board, piece)
+local function queen(board, piece)
     -- just run rook and bishop lul
     local possibilities = {}
     for i, pos in pairs(rook(board, piece)) do
@@ -306,7 +326,7 @@ function queen(board, piece)
     return possibilities
 end
 
-function king(board, piece)
+local function king(board, piece)
     local h = piece.coordinates.horizontal
     local v = piece.coordinates.vertical
     local possibilities = {}
@@ -325,13 +345,14 @@ function king(board, piece)
     end
     if not piece.lastPosition and board[TranslateSpace{v, h + 1}] and not board[TranslateSpace{v, h + 1}].piece
     and board[TranslateSpace{v, h + 2}] and not board[TranslateSpace{v, h + 2}].piece and board[TranslateSpace{v, h + 3}]
-    and board[TranslateSpace{v, h + 3}].piece.type == "rook" and not board[TranslateSpace{v, h + 3}].piece.lastPosition then
+    and board[TranslateSpace{v, h + 3}].piece and board[TranslateSpace{v, h + 3}].piece.type == "rook" and not
+    board[TranslateSpace{v, h + 3}].piece.lastPosition then
         table.insert(possibilities, "kc")
     end
     if not piece.lastPosition and board[TranslateSpace{v, h - 1}] and not board[TranslateSpace{v, h - 1}].piece
     and board[TranslateSpace{v, h - 2}] and not board[TranslateSpace{v, h - 2}].piece  and board[TranslateSpace{v, h - 3}] 
-    and not board[TranslateSpace{v, h - 3}].piece and board[TranslateSpace{v, h - 4}] and board[TranslateSpace{v, h - 4}].piece.type == "rook" 
-    and not board[TranslateSpace{v, h - 4}].piece.lastPosition then
+    and not board[TranslateSpace{v, h - 3}].piece and board[TranslateSpace{v, h - 4}] and board[TranslateSpace{v, h - 4}].piece
+    and board[TranslateSpace{v, h - 4}].piece.type == "rook" and not board[TranslateSpace{v, h - 4}].piece.lastPosition then
         table.insert(possibilities, "qc")
     end
     return possibilities
@@ -345,17 +366,6 @@ local behaviors = {
     queen = queen,
     king = king,
 }
-
---[[ was gonna set pieces up as a metatable but then didnt
-local pieces = {
-    pawn = {type = "pawn", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.pawn},
-    knight = {type = "knight", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.knight},
-    rook = {type = "rook", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.rook},
-    bishop = {type = "bishop", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.bishop},
-    queen = {type = "queen", color = "", coordinates = {vertical = 0, horizontal = 0}, behavior = behaviors.queen},
-    king = {type = "king", color = "", coordinates = {vertical = 0, horizontal = 0},  behavior = behaviors.king},
-}
-]]
 
 function board:new(old)
     -- create the board object
@@ -402,11 +412,10 @@ function board:find_king(color)
     end
 end
 
-function board:display()
+function board:display(color)
     -- uses chessboardimage.com to genereate a board image
     local urlString = "https://chessboardimage.com/"
     for v = 8, 1, -1 do
-        local toAdd = ""
         local numSincePiece = 0
         for h = 1, 8 do
             local space = TranslateSpace({v, h})
@@ -424,6 +433,9 @@ function board:display()
             urlString = urlString..numSincePiece
         end
         urlString = urlString.."/"
+    end
+    if color == "black" then
+        urlString = urlString.."-flip"
     end
     urlString = urlString..".png"
     return urlString
@@ -458,14 +470,28 @@ end
 function board:move(piece, position)
     --kc for kingside castling
     --qc for queenside castling
-    -- move on the board. return true if possible
+    --move on the board. return true if possible
+    --promotion is denoted by an appended 'p'
+    local promotions = {q = "queen", b = "bishop" , r = "rook", n = "knight"}
+    local promotion_piece = "queen"
     local new_pos = position
     local wKingCastle = false
     local wQueenCastle = false
     local bKingCastle = false
     local bQueenCastle = false
     local piecePos = TranslateSpace({piece.coordinates.vertical, piece.coordinates.horizontal})
-    if in_table(self:get_moves(piecePos), new_pos) then
+    local possible_moves = self:get_moves(piecePos) -- no need to update it later.
+    if new_pos:len() > 2 and new_pos:sub(3, 3) == "p" then
+        if new_pos:len() > 3 and promotions[new_pos:sub(4, 4)] then
+            promotion_piece = promotions[new_pos:sub(4, 4)]
+        end
+        piece.type = promotion_piece
+        new_pos = new_pos:sub(1, 3)
+    end
+    if in_table(possible_moves, new_pos) then
+        if new_pos:sub(3, 3) == "p" then
+            new_pos = new_pos:sub(1, 2)
+        end
         if piece.color == "black" and new_pos == "kc" then
             new_pos = "g8"
             bKingCastle = true
@@ -554,10 +580,19 @@ function board:RemoveCastle(color, type)
     end
 end
 
+function board:remove_promote(origPos, new_pos, type, removed)
+    self[origPos].piece = self[new_pos:sub(1, 2)].piece
+    self[origPos].piece.type = type
+    self[new_pos:sub(1, 2)].piece = removed or nil
+    self[origPos].piece.coordinates = TranslateCoords(origPos)
+end
+
+-- need to add promotion here and in move
 function board:SimulateMove(piece, position)
     local orig_v = piece.coordinates.vertical
     local orig_h = piece.coordinates.horizontal
     local origPos = TranslateSpace({orig_v, orig_h})
+    local orig_type = piece.type
     local possible = false
     local tryMove, rem = self:move(piece, position)
     if tryMove then
@@ -565,14 +600,23 @@ function board:SimulateMove(piece, position)
             possible = true
         end
         if rem then
-            self[origPos].piece = self[position].piece
-            self[position].piece = rem
-            self[origPos].piece.coordinates = TranslateCoords(origPos)
-        else
-            --checking in case of castling
-            if position == "kc" or position == "qc" then
-                self:RemoveCastle(piece.color, position)
+            if position:len() > 2 and position:sub(3, 3) == "p" then
+                self:remove_promote(origPos, position, orig_type, rem)
             else
+                self[origPos].piece = self[position].piece
+                self[position].piece = rem
+                self[origPos].piece.coordinates = TranslateCoords(origPos)
+            end
+        else
+            --checking in case of castling or promotion
+            if position == "kc" or position == "qc" then
+                -- castle
+                self:RemoveCastle(piece.color, position)
+            elseif position:len() > 2 and position:sub(3, 3) == "p" then
+                -- promotion
+                self:remove_promote(origPos, position, orig_type)
+            else
+                -- normal move
                 self[origPos].piece = self[position].piece
                 self[position].piece = nil
                 self[origPos].piece.coordinates = TranslateCoords(origPos)
@@ -607,9 +651,6 @@ function board:checkmate(king)
     local sacs = {}
     if self:get_checks(king) then
         for i, m in pairs(self:get_moves(king)) do
-            local orig_v = kingPiece.coordinates.vertical
-            local orig_h = kingPiece.coordinates.horizontal
-            local origPos = TranslateSpace({orig_v, orig_h})
             local possible = self:SimulateMove(kingPiece, m)
             if possible then
                 table.insert(move_out, m)
@@ -621,6 +662,47 @@ function board:checkmate(king)
         return false
     end
     return true
+end
+
+function board:only_kings()
+    -- see if the board is only kings
+    for v = 8, 1, -1 do
+        for h = 1, 8 do
+            local piece = TranslateSpace({v, h})
+            if self[piece].piece ~= "king" then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+function board:stalemate()
+    if self:only_kings() then
+        return true
+    end
+    local white_king = self:find_king("white")
+    local black_king = self:find_king("black")
+    if #(self:CheckSacs("white")) == 0 or #(self:CheckSacs("black")) == 0 then
+        local white_possible = false
+        local black_possible = false
+        for move in pairs(self:get_moves(white_king)) do
+            if self:SimulateMove(white_king, move) then
+                white_possible = true
+                break
+            end
+        end
+        for move in pairs(self:get_moves(black_king)) do
+            if self:SimulateMove(black_king, move) then
+                black_possible = true
+                break
+            end
+        end
+        if not white_possible or not black_possible then
+            return true
+        end
+    end
+    return false
 end
 
 function board:validate_and_move(piece, position)
