@@ -1,4 +1,5 @@
 # shaft-chess: a pretty scuffed chess module in lua
+THIS REPOSITORY IS NO LONGER BEING UPDATED AND IS VERY BUGGY
 ### Usage:
 ```lua
 local chess = require("file path here")
