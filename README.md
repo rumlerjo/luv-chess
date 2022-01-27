@@ -1,5 +1,5 @@
 # shaft-chess: a pretty scuffed chess module in lua
-THIS REPOSITORY IS NO LONGER BEING UPDATED AND IS VERY BUGGY
+this repo was built very quickly and was a learning experience, i've learned a lot more about algorithms since and plan to rewrite it.
 ### Usage:
 ```lua
 local chess = require("file path here")
