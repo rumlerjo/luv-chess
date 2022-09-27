@@ -1,4 +1,4 @@
-# shaft-chess: a pretty scuffed chess module in lua
+# luv-chess: a pretty scuffed chess module in lua
 this repo was built very quickly and was a learning experience, i've learned a lot more about algorithms since and plan to rewrite it.
 ### Usage:
 ```lua
